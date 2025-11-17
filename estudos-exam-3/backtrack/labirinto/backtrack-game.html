@@ -1,0 +1,417 @@
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Aprendendo Backtracking — Labirinto Interativo (Claro)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,Segoe UI,Arial;background:linear-gradient(135deg,#f9fafb 0%,#e2e8f0 100%);color:#1e293b;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:28px}
+.app{width:1100px;max-width:100%;background:#ffffffd9;border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.1);color:#1e293b}
+h1{font-size:20px;margin-bottom:10px;color:#0f172a}
+.top{display:flex;gap:16px;align-items:center}
+.controls{display:flex;flex-wrap:wrap;gap:10px}
+button{background:#38bdf8;border:none;padding:8px 12px;border-radius:8px;color:#0f172a;cursor:pointer}
+button.secondary{background:#fbbf24;color:#1e293b}
+label{font-size:13px}
+.panel{background:rgba(0,0,0,0.05);padding:12px;border-radius:10px;color:#1e293b}
+#maze{display:grid;gap:2px;background:#f1f5f9;padding:8px;border-radius:10px;margin-top:16px}
+.cell{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border-radius:6px;user-select:none;border:1px solid #cbd5e1}
+.wall{background:#94a3b8}
+.path{background:#f8fafc}
+.start{background:#0ea5e9;color:#fff;box-shadow:0 0 6px #0ea5e9}
+.end{background:#ef4444;color:#fff;box-shadow:0 0 6px #ef4444}
+.current{background:#f59e0b;color:#fff;box-shadow:0 0 6px #f59e0b}
+.visited{background:#3b82f6;color:#fff}
+.backtrack{background:#a855f7;color:#fff}
+.solution{background:#22c55e;color:#fff}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.legend .item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.05);color:#1e293b}
+.rightcol{margin-left:16px;min-width:320px}
+.row{display:flex;gap:10px}
+select,input[type=number],input[type=range]{padding:6px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e293b}
+.small{font-size:13px;color:#1e293b}
+pre.code{background:#e2e8f0;color:#1e293b;font-size:12px;padding:10px;border-radius:8px;overflow:auto}
+.hint{font-size:13px;color:#475569;margin-top:8px}
+.footer{margin-top:12px;font-size:13px;color:#475569}
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div style="flex:1">
+        <h1>🎮 Backtracking Lab — Interativo (clique nas células para criar paredes)</h1>
+        <div class="hint">Crie paredes, mude início/fim aleatório, troque a ordem de direções e force o algoritmo a encontrar todas as soluções. Use Passo-a-Passo para praticar.</div>
+      </div>
+      <div class="rightcol panel">
+        <div class="controls">
+          <button id="startBtn">▶️ Iniciar</button>
+          <button id="pauseBtn">⏸️ Pausar</button>
+          <button id="stepBtn" class="secondary">👣 Passo</button>
+          <button id="resetBtn">🔄 Reset</button>
+          <button id="newBtn">🎲 Novo Labirinto</button>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <label class="small">Tamanho:</label>
+          <input id="rowsInput" type="number" min="7" max="35" value="15" style="width:68px"> x
+          <input id="colsInput" type="number" min="7" max="35" value="15" style="width:68px">
+        </div>
+        <div style="margin-top:8px">
+          <label class="small">Velocidade (ms): <span id="speedLabel">200</span></label>
+          <input id="speedRange" type="range" min="10" max="800" value="200">
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <label class="small">Direções (ordem):</label>
+          <select id="dirOrder" class="small">
+            <option value="0,1,2,3">Cima, Direita, Baixo, Esquerda</option>
+            <option value="1,2,3,0">Direita, Baixo, Esquerda, Cima</option>
+            <option value="2,3,0,1">Baixo, Esquerda, Cima, Direita</option>
+            <option value="3,0,1,2">Esquerda, Cima, Direita, Baixo</option>
+          </select>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <label class="small"><input type="checkbox" id="forcePath"> Garantir ao menos 1 caminho</label>
+          <label class="small" style="margin-left:8px"><input type="checkbox" id="findAll"> Encontrar todas as soluções</label>
+        </div>
+        <div class="panel" style="margin-top:8px">
+          <div><strong>Estatísticas</strong></div>
+          <div class="row" style="margin-top:6px">
+            <div class="small">Passos: <span id="steps">0</span></div>
+            <div class="small">Backtracks: <span id="backtracks">0</span></div>
+            <div class="small">Caminho atual: <span id="pathLen">0</span></div>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <div class="small">Soluções encontradas: <span id="solutionsCount">0</span></div>
+            <div class="small">Estado: <span id="status">Parado</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;margin-top:12px">
+      <div>
+        <div id="maze"></div>
+        <div class="legend">
+          <div class="item"><div style="width:16px;height:16px;background:#06b6d4;border-radius:4px"></div> Início</div>
+          <div class="item"><div style="width:16px;height:16px;background:#fb7185;border-radius:4px"></div> Fim</div>
+          <div class="item"><div style="width:16px;height:16px;background:#f59e0b;border-radius:4px"></div> Atual</div>
+          <div class="item"><div style="width:16px;height:16px;background:#60a5fa;border-radius:4px"></div> Visitado</div>
+          <div class="item"><div style="width:16px;height:16px;background:#a78bfa;border-radius:4px"></div> Backtrack</div>
+          <div class="item"><div style="width:16px;height:16px;background:#34d399;border-radius:4px"></div> Solução</div>
+        </div>
+      </div>
+
+      <div style="width:380px">
+        <div class="panel">
+          <div><strong>Instruções Rápidas</strong></div>
+          <ol style="margin-top:8px;font-size:13px;color:#abc">
+            <li>Clique nas células para criar/remover paredes (somente quando parado).</li>
+            <li>Use "Novo Labirinto" para gerar obstáculos aleatórios.</li>
+            <li>Ative "Garantir caminho" para sempre ter pelo menos 1 rota (útil para comparar). Desative para forçar muitos becos.</li>
+            <li>Troque a ordem de direções — observe diferenças no número de backtracks.</li>
+            <li>Ative "Encontrar todas as soluções" para ver o algoritmo explorando todas as possibilidades.</li>
+          </ol>
+        </div>
+
+        <div class="panel" style="margin-top:10px">
+          <div><strong>Exemplo de Código (pseudocódigo)</strong></div>
+          <pre class="code">function backtrack(x,y):
+  if (isGoal) recordSolution
+  mark visited
+  for dir in order:
+    nx,ny = x+dx, y+dy
+    if valid and not visited:
+      if backtrack(nx,ny) and stopOnFirst: return true
+  unmark or keep visited? (for all-solutions don't unmark)
+  return false
+</pre>
+        </div>
+        <div class="footer">Dica: para treinar, desative "Garantir caminho" e crie labirintos com muitos becos — conte os backtracks.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------- Config padrão ----------------
+    let ROWS = 15, COLS = 15;
+    let maze = [];// 0 caminho, 1 parede
+    let visited = [];
+    let path = [];
+    let start = null;
+    let end = null;
+    let running = false;
+    let paused = false;
+    let speed = 200;
+    let steps = 0, backtracks = 0;
+    let solutions = [];
+    let stopOnFirst = true;
+
+    const mazeDiv = document.getElementById('maze');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stepBtn = document.getElementById('stepBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const newBtn = document.getElementById('newBtn');
+    const rowsInput = document.getElementById('rowsInput');
+    const colsInput = document.getElementById('colsInput');
+    const dirOrderSel = document.getElementById('dirOrder');
+    const speedRange = document.getElementById('speedRange');
+    const speedLabel = document.getElementById('speedLabel');
+    const forcePathCb = document.getElementById('forcePath');
+    const findAllCb = document.getElementById('findAll');
+
+    // Estatísticas
+    const stepsSpan = document.getElementById('steps');
+    const backtracksSpan = document.getElementById('backtracks');
+    const pathLenSpan = document.getElementById('pathLen');
+    const solutionsCountSpan = document.getElementById('solutionsCount');
+    const statusSpan = document.getElementById('status');
+
+    // Direções fixas (cima,direita,baixo,esquerda)
+    const baseDirs = [[-1,0],[0,1],[1,0],[0,-1]];
+
+    // ---------------- Utilitários ----------------
+    function randInt(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+
+    function createEmptyMaze(r,c){
+      ROWS=r;COLS=c;
+      maze = Array.from({length:ROWS},()=>Array.from({length:COLS},()=>1));
+      // cria bordas e caminhos internos
+      for(let i=1;i<ROWS-1;i++){
+        for(let j=1;j<COLS-1;j++){
+          maze[i][j]=0;
+        }
+      }
+    }
+
+    function placeRandomStartEnd(){
+      start = [randInt(1,ROWS-2), randInt(1,COLS-2)];
+      end = [randInt(1,ROWS-2), randInt(1,COLS-2)];
+      while(start[0]===end[0] && start[1]===end[1]) end=[randInt(1,ROWS-2), randInt(1,COLS-2)];
+    }
+
+    function addRandomWalls(density=0.35){
+      for(let i=1;i<ROWS-1;i++){
+        for(let j=1;j<COLS-1;j++){
+          if((i===start[0]&&j===start[1])||(i===end[0]&&j===end[1])) continue;
+          maze[i][j] = Math.random()<density?1:0;
+        }
+      }
+    }
+
+    // Garante pelo menos um caminho (carve simple path) — opcional
+    function carvePath(){
+      let [x,y]=[start[0],start[1]];
+      maze[x][y]=0;
+      while(x!==end[0]||y!==end[1]){
+        if(Math.random()<0.6 && x!==end[0]){ x += Math.sign(end[0]-x); }
+        else if(y!==end[1]){ y += Math.sign(end[1]-y); }
+        else if(x!==end[0]){ x += Math.sign(end[0]-x); }
+        maze[x][y]=0;
+      }
+    }
+
+    function ensureReachable(){
+      // simples: se não alcançável, carvePath
+      if(!bfsReachable()) carvePath();
+    }
+
+    function bfsReachable(){
+      const q=[]; const seen = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+      q.push(start); seen[start[0]][start[1]]=true;
+      for(let k=0;k<q.length;k++){
+        const [x,y]=q[k];
+        if(x===end[0]&&y===end[1]) return true;
+        for(const [dx,dy] of baseDirs){
+          const nx=x+dx, ny=y+dy;
+          if(nx>=0&&nx<ROWS&&ny>=0&&ny<COLS&&!seen[nx][ny]&&maze[nx][ny]===0){seen[nx][ny]=true;q.push([nx,ny]);}
+        }
+      }
+      return false;
+    }
+
+    // ---------------- UI / Desenho ----------------
+    function drawMaze(){
+      mazeDiv.innerHTML='';
+      mazeDiv.style.gridTemplateColumns = `repeat(${COLS}, 28px)`;
+      for(let i=0;i<ROWS;i++){
+        for(let j=0;j<COLS;j++){
+          const el=document.createElement('div');
+          el.className='cell';
+          el.id=`cell-${i}-${j}`;
+          if(maze[i][j]===1) el.classList.add('wall'); else el.classList.add('path');
+          // conteúdo
+          if(i===start[0]&&j===start[1]){ el.classList.remove('path'); el.classList.add('start'); el.textContent='🚀'}
+          else if(i===end[0]&&j===end[1]){ el.classList.remove('path'); el.classList.add('end'); el.textContent='🎯'}
+          else el.textContent='';
+
+          // toggle parede por clique (só quando parado)
+          ((x,y)=>{
+            el.addEventListener('click',()=>{
+              if(running) return; // bloqueia alterações enquanto executa
+              if(x===start[0]&&y===start[1]) return;
+              if(x===end[0]&&y===end[1]) return;
+              maze[x][y] = maze[x][y]===1?0:1;
+              drawMaze();
+            });
+          })(i,j);
+
+          mazeDiv.appendChild(el);
+        }
+      }
+      updateStats();
+    }
+
+    function updateCell(x,y,cls,txt){
+      const el=document.getElementById(`cell-${x}-${y}`);
+      if(!el) return;
+      el.classList.remove('current','visited','backtrack','solution');
+      if(cls) el.classList.add(cls);
+      if(txt!==undefined) el.textContent = txt;
+      // mantém ícones start/end
+      if(x===start[0]&&y===start[1]){ el.classList.remove('visited','current','backtrack','solution'); el.classList.add('start'); el.textContent='🚀'; }
+      if(x===end[0]&&y===end[1]){ el.classList.remove('visited','current','backtrack','solution'); el.classList.add('end'); el.textContent='🎯'; }
+    }
+
+    function updateStats(){
+      stepsSpan.textContent = steps;
+      backtracksSpan.textContent = backtracks;
+      pathLenSpan.textContent = path.length;
+      solutionsCountSpan.textContent = solutions.length;
+    }
+
+    // ---------------- Backtracking ----------------
+    function getDirsFromOrder(){
+      const order = dirOrderSel.value.split(',').map(Number);
+      return order.map(i=>baseDirs[i]);
+    }
+
+    function sleep(ms){
+      return new Promise(r=>setTimeout(r,ms));
+    }
+
+    // Recursivo clássico — adaptado para encontrar todas as soluções se pedido
+    async function backtrack(x,y){
+      if(!running) return false;
+      if(paused) { while(paused && running) await sleep(50); if(!running) return false; }
+
+      // chegou?
+      if(x===end[0]&&y===end[1]){
+        solutions.push([...path, [x,y]]);
+        highlightSolution([...path,[x,y]]);
+        updateStats();
+        if(stopOnFirst) return true; // encerra
+        // se queremos todas soluções, não retornamos true, apenas seguimos para explorar
+      }
+
+      visited[x][y]=true; path.push([x,y]); steps++; updateCell(x,y,'current','🤖'); updateStats();
+      await sleep(speed);
+
+      const dirs = getDirsFromOrder();
+      for(const [dx,dy] of dirs){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||nx>=ROWS||ny<0||ny>=COLS) continue;
+        if(maze[nx][ny]===1) continue;
+        if(visited[nx][ny]) continue;
+        if(await backtrack(nx,ny) && stopOnFirst) return true;
+      }
+
+      // nada funcionou => backtrack
+      path.pop();
+      if(!running) return false;
+      backtracks++; updateCell(x,y,'backtrack','↩️'); updateStats(); await sleep(Math.max(40, speed/3));
+      updateCell(x,y,'visited','👣');
+      return false;
+    }
+
+    async function solve(){
+      running=true; paused=false; statusSpan.textContent='Executando...';
+      visited = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+      path=[]; solutions=[]; steps=0; backtracks=0; updateStats();
+      stopOnFirst = !findAllCb.checked;
+      await backtrack(start[0], start[1]);
+      running=false;
+      statusSpan.textContent = solutions.length>0? 'Concluído' : 'Sem Solução';
+    }
+
+    // Highlight menor solução (após execução)
+    function highlightSolution(sol){
+      // mostra todos os nós da solução atual
+      for(const [x,y] of sol){
+        if((x===start[0]&&y===start[1])||(x===end[0]&&y===end[1])) continue;
+        updateCell(x,y,'solution','✨');
+      }
+    }
+
+    // ---------------- Passo a passo ----------------
+    let stepCursor = null;
+    function resetStepMode(){ stepCursor = {stack:[[...start]], visited: Array.from({length:ROWS},()=>Array(COLS).fill(false))}; }
+
+    function stepOnce(){
+      if(running) return;
+      if(!stepCursor){ resetStepMode(); }
+      const st = stepCursor.stack;
+      if(st.length===0){ statusSpan.textContent='Parado'; return; }
+      const top = st[st.length-1];
+      const [x,y] = top[top.length-1];
+      // se chegou
+      if(x===end[0]&&y===end[1]){ solutions.push(top); highlightSolution(top); solutionsCountSpan.textContent=solutions.length; return; }
+
+      // tenta avançar
+      const dirs = getDirsFromOrder();
+      let moved=false;
+      for(const [dx,dy] of dirs){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||nx>=ROWS||ny<0||ny>=COLS) continue;
+        if(maze[nx][ny]===1) continue;
+        if(stepCursor.visited[nx][ny]) continue;
+        // move
+        stepCursor.visited[nx][ny]=true;
+        top.push([nx,ny]);
+        updateCell(x,y,'visited','👣'); updateCell(nx,ny,'current','🤖'); moved=true; break;
+      }
+      if(!moved){
+        // backtrack
+        top.pop(); backtracks++; updateCell(x,y,'backtrack','↩️');
+        if(top.length===0) stepCursor.stack.pop();
+        else updateCell(top[top.length-1][0], top[top.length-1][1], 'current','🤖');
+      }
+      steps++; updateStats();
+    }
+
+    // ---------------- Eventos UI ----------------
+    startBtn.onclick = async ()=>{ if(running) return; speed = Number(speedRange.value); stopOnFirst = !findAllCb.checked; await solve(); };
+    pauseBtn.onclick = ()=>{ paused = !paused; statusSpan.textContent = paused? 'Pausado' : (running? 'Executando...' : 'Parado'); };
+    stepBtn.onclick = ()=>{ stepOnce(); };
+    resetBtn.onclick = ()=>{ running=false; paused=false; solutions=[]; steps=0; backtracks=0; visited = Array.from({length:ROWS},()=>Array(COLS).fill(false)); path=[]; drawMaze(); statusSpan.textContent='Parado'; updateStats(); stepCursor=null; };
+
+    newBtn.onclick = ()=>{ buildNewMaze(); };
+
+    speedRange.oninput = ()=>{ speedLabel.textContent = speedRange.value; };
+
+    rowsInput.onchange = ()=>{ const r = Math.max(7, Math.min(35, Number(rowsInput.value))); rowsInput.value=r; buildNewMaze(); };
+    colsInput.onchange = ()=>{ const c = Math.max(7, Math.min(35, Number(colsInput.value))); colsInput.value=c; buildNewMaze(); };
+
+    // Construção do labirinto (inicial e quando clicar 'Novo')
+    function buildNewMaze(){
+      const r = Number(rowsInput.value), c = Number(colsInput.value);
+      createEmptyMaze(r,c);
+      placeRandomStartEnd();
+      addRandomWalls(forcePathCb.checked?0.30:0.45);
+      if(forcePathCb.checked) ensureReachable();
+      drawMaze();
+      solutions=[]; updateStats(); statusSpan.textContent='Parado';
+    }
+
+    // Inicializa ao abrir
+    buildNewMaze();
+
+    // Atalho teclado: N = novo, R = reset, Space = iniciar/pausar, S = passo
+    window.addEventListener('keydown', (e)=>{
+      if(e.key==='n' || e.key==='N') buildNewMaze();
+      if(e.key==='r' || e.key==='R') resetBtn.click();
+      if(e.code==='Space'){ if(!running) startBtn.click(); else pauseBtn.click(); e.preventDefault(); }
+      if(e.key==='s' || e.key==='S') stepBtn.click();
+    });
+  </script>
+</body>
+</html>
